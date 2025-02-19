@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/sequelize';
 import { Todo } from './todo.model';
 
@@ -13,24 +13,36 @@ export class TodoService {
   async findOne(id: number): Promise<Todo> {
     const todo = await this.todoModel.findByPk(id);
     if (!todo) {
-      throw new Error('Todo not found');
+      throw new NotFoundException(`Todo with ID ${id} not found`);
     }
     return todo;
   }
 
   async create(title: string): Promise<Todo> {
-    return this.todoModel.create({ title, completed: false });
+    return this.todoModel.create({ title });
   }
 
-  async update(id: number, completed: boolean): Promise<[number, Todo[]]> {
-    return this.todoModel.update(
+  async update(id: number, completed: boolean): Promise<Todo> {
+    const [affectedCount] = await this.todoModel.update(
       { completed },
-      { where: { id }, returning: true },
+      { where: { id } },
     );
+
+    if (affectedCount === 0) {
+      throw new NotFoundException(`Todo with ID ${id} not found`);
+    }
+
+    // Then fetch the updated record
+    const updatedTodo = await this.todoModel.findByPk(id);
+    if (!updatedTodo) {
+      throw new NotFoundException(`Todo with ID ${id} not found`);
+    }
+
+    return updatedTodo;
   }
 
-  async delete(id: number): Promise<void> {
-    const todo = await this.findOne(id);
-    if (todo) await todo.destroy();
+  async delete(id: number): Promise<boolean> {
+    const deleted = await this.todoModel.destroy({ where: { id } });
+    return deleted > 0;
   }
 }

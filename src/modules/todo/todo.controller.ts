@@ -6,35 +6,73 @@ import {
   Delete,
   Body,
   Param,
+  NotFoundException,
+  ParseIntPipe,
 } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { TodoService } from './todo.service';
+import { CreateTodoDto } from './dto/create-todo.dto';
+import { UpdateTodoDto } from './dto/update-todo.dto';
+import { Todo } from './todo.model';
 
+@ApiTags('todos')
 @Controller('todos')
 export class TodoController {
   constructor(private readonly todoService: TodoService) {}
 
   @Get()
-  async findAll() {
+  @ApiOperation({ summary: 'Get all todos' })
+  @ApiResponse({ status: 200, description: 'Return all todos.', type: [Todo] })
+  async findAll(): Promise<Todo[]> {
     return this.todoService.findAll();
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string) {
-    return this.todoService.findOne(Number(id));
+  @ApiOperation({ summary: 'Get a todo by id' })
+  @ApiResponse({ status: 200, description: 'Return a todo.', type: Todo })
+  @ApiResponse({ status: 404, description: 'Todo not found.' })
+  async findOne(@Param('id', ParseIntPipe) id: number): Promise<Todo> {
+    const todo = await this.todoService.findOne(id);
+    if (!todo) {
+      throw new NotFoundException(`Todo with ID ${id} not found`);
+    }
+    return todo;
   }
 
   @Post()
-  async create(@Body('title') title: string) {
-    return this.todoService.create(title);
+  @ApiOperation({ summary: 'Create a new todo' })
+  @ApiResponse({
+    status: 201,
+    description: 'The todo has been created.',
+    type: Todo,
+  })
+  async create(@Body() createTodoDto: CreateTodoDto): Promise<Todo> {
+    return this.todoService.create(createTodoDto.title);
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body('completed') completed: boolean) {
-    return this.todoService.update(Number(id), completed);
+  @ApiOperation({ summary: 'Update a todo' })
+  @ApiResponse({
+    status: 200,
+    description: 'The todo has been updated.',
+    type: Todo,
+  })
+  @ApiResponse({ status: 404, description: 'Todo not found.' })
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateTodoDto: UpdateTodoDto,
+  ): Promise<Todo> {
+    return this.todoService.update(id, updateTodoDto.completed ?? false);
   }
 
   @Delete(':id')
-  async delete(@Param('id') id: string) {
-    return this.todoService.delete(Number(id));
+  @ApiOperation({ summary: 'Delete a todo' })
+  @ApiResponse({ status: 204, description: 'The todo has been deleted.' })
+  @ApiResponse({ status: 404, description: 'Todo not found.' })
+  async delete(@Param('id', ParseIntPipe) id: number): Promise<void> {
+    const deleted = await this.todoService.delete(id);
+    if (!deleted) {
+      throw new NotFoundException(`Todo with ID ${id} not found`);
+    }
   }
 }
